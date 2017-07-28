@@ -1,0 +1,10 @@
+{
+	"name": "notnull",
+	"dflags-dmd" : ["-dip1000"],
+	"authors": [
+		"burner"
+	],
+	"description": "A small library to make null checks fun.",
+	"copyright": "Copyright © 2017, burner",
+	"license": "LGPL3"
+}

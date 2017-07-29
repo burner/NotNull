@@ -8,7 +8,7 @@ class NullPointerException : Exception {
     }
 }
 
-ref T nnl(T)(return scope T* ptr, string file = __FILE__,
+ref T nnL(T)(return scope T* ptr, string file = __FILE__,
 	   	size_t line = __LINE__) 
 {
 	if(ptr is null) {
@@ -20,15 +20,15 @@ ref T nnl(T)(return scope T* ptr, string file = __FILE__,
 
 unittest {
 	int a;
-	nnl(&a);
+	nnL(&a);
 
-	(&a).nnl();
+	(&a).nnL();
 }
 
 unittest {
 	import std.exception : assertThrown;
 	int* a = null;
-	assertThrown!NullPointerException(nnl(a));
+	assertThrown!NullPointerException(nnL(a));
 }
 
 unittest {
@@ -41,14 +41,14 @@ unittest {
 	}
 
 	B* b;
-	assertThrown!NullPointerException(nnl(b));
+	assertThrown!NullPointerException(nnL(b));
 	
 	b = new B;
-	assertNotThrown(nnl(b));
+	assertNotThrown(nnL(b));
 
-	assertThrown!NullPointerException(nnl(b).a.nnl());
-	assertThrown!NullPointerException(b.nnl().a.nnl());
+	assertThrown!NullPointerException(nnL(b).a.nnL());
+	assertThrown!NullPointerException(b.nnL().a.nnL());
 
 	b.a = new A;
-	assertNotThrown(nnl(b).a.nnl());
+	assertNotThrown(nnL(b).a.nnL());
 }

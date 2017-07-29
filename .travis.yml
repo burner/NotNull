@@ -1,0 +1,19 @@
+language: d
+sudo: false
+
+d:
+  - dmd-nightly
+  - dmd-beta
+  - dmd
+  - ldc-beta
+  - ldc
+  - dmd-2.072.2
+  - dmd-2.073.2
+  - dmd-2.074.1
+  - dmd-2.075.0
+
+script:
+  - dub test --compiler=${DC}
+
+notifications:
+  email: false

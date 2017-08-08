@@ -157,9 +157,9 @@ struct Null(T,Exp...) {
 		this.error = ErrorType.hasData;
 	}
 
-	void set(E,Args...)(auto ref Args args) {
+	void set(E, string file = __FILE__, size_t line = __LINE__, Args...)(auto ref Args args) {
 		import std.conv : emplace;
-		emplace!E(this.payload[0 .. $], args);
+		emplace!E(this.payload[0 .. $], args, file, line);
 		mixin("this.error = ErrorType." ~ E.stringof ~ ";");
 	}
 
@@ -190,7 +190,7 @@ T makeNull(T,E, string file = __FILE__, size_t line = __LINE__, Args...)
 		(auto ref Args args) 
 {
 	T ret;
-	ret.set!E(args, file, line);
+	ret.set!(E,file,line)(args);
 	return ret;
 }
 
@@ -210,8 +210,8 @@ pure unittest {
 	NullInt ni;
 
 	string f = __FILE__;
-	int l = __LINE__;
-	ni.set!NullPointerException(f, l);
+	int l = __LINE__ + 1;
+	ni.set!NullPointerException();
 	assert(ni.getError() == NullInt.ErrorType.NullPointerException);
 
 	NullPointerException npe;
@@ -256,4 +256,19 @@ pure unittest {
 		return;
 	}
 	assert(false, "Wrong Exception rethrown");
+}
+
+pure unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	NullInt ni;
+	assert(ni.isNull);
+	assert(!ni.isNotNull);
+
+	ni = 10;
+	assert(!ni.isNull);
+	assert(ni.isNotNull);
+	assert(ni.get() == 10);
+
+	ni.set!NullPointerException();
+	assert(ni.isNull);
 }

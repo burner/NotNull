@@ -90,31 +90,31 @@ private string buildThrowSwitchRecu(E...)() if(E.length > 0) {
 	static if(is(E[0] == Exception)) {
 		return "case ErrorType.Exception:" ~
 			"throw new Exception(" ~
-				"(cast(Exception*)(this.payload.ptr)).msg," ~
-				"(cast(Exception*)(this.payload.ptr)).file," ~
-				"(cast(Exception*)(this.payload.ptr)).line," ~
-				"(cast(Exception*)(this.payload.ptr)).next);"
+				"(cast(Exception)(this.payload.ptr)).msg," ~
+				"(cast(Exception)(this.payload.ptr)).file," ~
+				"(cast(Exception)(this.payload.ptr)).line," ~
+				"(cast(Exception)(this.payload.ptr)).next);"
 			~ buildThrowSwitchRecu!(E[1 .. $]);
 	} else static if(is(E[0] == Error)) {
 		return "case ErrorType.Error:" ~
 			"throw new Error(" ~
-				"(cast(Error*)(this.payload.ptr)).msg," ~
-				"(cast(Error*)(this.payload.ptr)).file," ~
-				"(cast(Error*)(this.payload.ptr)).line," ~
-				"(cast(Error*)(this.payload.ptr)).next);"
+				"(cast(Error)(this.payload.ptr)).msg," ~
+				"(cast(Error)(this.payload.ptr)).file," ~
+				"(cast(Error)(this.payload.ptr)).line," ~
+				"(cast(Error)(this.payload.ptr)).next);"
 			~ buildThrowSwitchRecu!(E[1 .. $]);
 	} else static if(is(E[0] == Throwable)) {
 		return "case ErrorType.Throwable:" ~
 			"throw new Throwable(" ~
-				"(cast(Throwable*)(this.payload.ptr)).msg," ~
-				"(cast(Throwable*)(this.payload.ptr)).file," ~
-				"(cast(Throwable*)(this.payload.ptr)).line," ~
-				"(cast(Throwable*)(this.payload.ptr)).next);"
+				"(cast(Throwable)(this.payload.ptr)).msg," ~
+				"(cast(Throwable)(this.payload.ptr)).file," ~
+				"(cast(Throwable)(this.payload.ptr)).line," ~
+				"(cast(Throwable)(this.payload.ptr)).next);"
 			~ buildThrowSwitchRecu!(E[1 .. $]);
 	} else {
 		return "case ErrorType." ~ E[0].stringof ~ `:
-			throw new ` ~ E[0].stringof ~ "(*(cast(" ~ E[0].stringof 
-			~ "*)(this.payload.ptr)));"
+			throw new ` ~ E[0].stringof ~ "((cast(" ~ E[0].stringof 
+			~ ")(this.payload.ptr)));"
 			~ buildThrowSwitchRecu!(E[1 .. $]);
 	}
 }

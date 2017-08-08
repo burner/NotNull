@@ -8,6 +8,10 @@ class NullPointerException : Exception {
 	{
         super("Tried to deference a null pointer", file, line, next );
     }
+
+    @safe pure nothrow this(NullPointerException old) {
+		super(old.msg, old.file, old.line, old.next);
+	}
 }
 
 /** Returns a reference to the object the passed pointer points to.
@@ -56,4 +60,147 @@ unittest {
 
 	b.a = new A;
 	assertNotThrown(nnL(b).a.nnL());
+}
+
+private string buildErrorStringRecur(E...)() if(E.length > 0) {
+	return E[0].stringof ~ "," ~ buildErrorStringRecur!(E[1 .. $]);
+}
+
+private string buildErrorStringRecur(E...)() if(E.length == 0) {
+	return "}";
+}
+
+private string buildErrorString(Exp...)() {
+	return "enum ErrorType { hasData, hasNoData, " ~ 
+		buildErrorStringRecur!Exp();
+}
+
+private string buildThrowSwitch(Exp...)() {
+	return `switch(this.error) {
+		case ErrorType.hasData:
+			goto default;
+		default:
+			break;
+		case ErrorType.hasNoData:
+			assert(false, "No Data nor an Exception Present");
+	`~ buildThrowSwitchRecu!(Exp)();
+}
+
+private string buildThrowSwitchRecu(E...)() if(E.length > 0) {
+	static if(is(E[0] == Exception)) {
+		return "case ErrorType.Exception:" ~
+			"throw new Exception(" ~
+				"(cast(Exception*)(this.payload.ptr)).msg," ~
+				"(cast(Exception*)(this.payload.ptr)).file," ~
+				"(cast(Exception*)(this.payload.ptr)).line," ~
+				"(cast(Exception*)(this.payload.ptr)).next);"
+			~ buildThrowSwitchRecu!(E[1 .. $]);
+	} else static if(is(E[0] == Error)) {
+		return "case ErrorType.Error:" ~
+			"throw new Error(" ~
+				"(cast(Error*)(this.payload.ptr)).msg," ~
+				"(cast(Error*)(this.payload.ptr)).file," ~
+				"(cast(Error*)(this.payload.ptr)).line," ~
+				"(cast(Error*)(this.payload.ptr)).next);"
+			~ buildThrowSwitchRecu!(E[1 .. $]);
+	} else static if(is(E[0] == Throwable)) {
+		return "case ErrorType.Throwable:" ~
+			"throw new Throwable(" ~
+				"(cast(Throwable*)(this.payload.ptr)).msg," ~
+				"(cast(Throwable*)(this.payload.ptr)).file," ~
+				"(cast(Throwable*)(this.payload.ptr)).line," ~
+				"(cast(Throwable*)(this.payload.ptr)).next);"
+			~ buildThrowSwitchRecu!(E[1 .. $]);
+	} else {
+		return "case ErrorType." ~ E[0].stringof ~ `:
+			throw new ` ~ E[0].stringof ~ "(*(cast(" ~ E[0].stringof 
+			~ "*)(this.payload.ptr)));"
+			~ buildThrowSwitchRecu!(E[1 .. $]);
+	}
+}
+
+private string buildThrowSwitchRecu(E...)() if(E.length == 0) {
+	return "}";
+}
+
+private template classSize(C) if(is(C : Exception)) {
+	enum classSize = __traits(classInstanceSize, C);
+}
+
+template Null(T, Exp...) {
+	struct Null {
+		import std.algorithm.comparison : max;
+		import std.meta : staticMap;
+		import std.traits : isImplicitlyConvertible;
+
+		void[max(staticMap!(classSize, Exp), T.sizeof)] payload;
+		mixin(buildErrorString!Exp());
+		ErrorType error = ErrorType.hasNoData;
+
+		@property bool isNull() pure nothrow @nogc const {
+			return this.error == ErrorType.hasNoData;
+		}
+
+		@property bool isNotNull() pure nothrow @nogc const {
+			return this.error == ErrorType.hasData;
+		}
+		
+		void opAssign(S)(auto ref S s) if(isImplicitlyConvertible!(S,T)) {
+			*(cast(T*)(this.payload.ptr)) = s;
+			this.error = ErrorType.hasData;
+		}
+
+		void set(E,Args...)(auto ref Args args) {
+			import std.conv : emplace;
+			emplace!E(this.payload[0 .. $], args);
+			mixin("this.error = ErrorType." ~ E.stringof ~ ";");
+		}
+
+		ErrorType getError() const pure @safe nothrow @nogc {
+			return this.error;
+		}
+
+		ref T get() @trusted {
+			if(this.error == ErrorType.hasData) {
+				return *(cast(T*)(this.payload.ptr));
+			}
+			mixin(buildThrowSwitch!(Exp)());
+			assert(false);
+		}
+
+		void rethrow() {
+			mixin(buildThrowSwitch!(Exp)());
+		}
+	}
+}
+
+unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	NullInt ni;
+	pragma(msg, NullInt.sizeof);
+	assert(ni.isNull);
+	assert(!ni.isNotNull);
+
+	ni = 10;
+	assert(ni.get() == 10);
+}
+
+unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	NullInt ni;
+
+	string f = __FILE__;
+	int l = __LINE__;
+	ni.set!NullPointerException(f, l);
+	assert(ni.getError() == NullInt.ErrorType.NullPointerException);
+
+	NullPointerException npe;
+	try {
+		ni.rethrow();
+	} catch(NullPointerException e) {
+		npe = e;
+	}
+	assert(npe !is null);
+	assert(npe.file == f, npe.file);
+	assert(npe.line == l);
 }

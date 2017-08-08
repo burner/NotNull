@@ -124,57 +124,77 @@ private string buildThrowSwitchRecu(E...)() if(E.length == 0) {
 }
 
 private template classSize(C) if(is(C : Exception)) {
-	enum classSize = __traits(classInstanceSize, C);
+	enum size_t classSize = __traits(classInstanceSize, C);
 }
 
-template Null(T, Exp...) {
-	struct Null {
-		import std.algorithm.comparison : max;
-		import std.meta : staticMap;
-		import std.traits : isImplicitlyConvertible;
+struct Null(T,Exp...) {
+	import std.algorithm.comparison : max;
+	import std.meta : staticMap;
+	import std.traits : isImplicitlyConvertible;
 
+	alias Type = T;
+
+	static if(Exp.length > 0) {
+		align(8)
 		void[max(staticMap!(classSize, Exp), T.sizeof)] payload;
-		mixin(buildErrorString!Exp());
-		ErrorType error = ErrorType.hasNoData;
+	} else {
+		align(8)
+		void[T.sizeof] payload;
+	}
+	mixin(buildErrorString!Exp());
+	ErrorType error = ErrorType.hasNoData;
 
-		@property bool isNull() pure nothrow @nogc const {
-			return this.error == ErrorType.hasNoData;
-		}
+	@property bool isNull() pure nothrow @nogc const {
+		return this.error >= ErrorType.hasNoData;
+	}
 
-		@property bool isNotNull() pure nothrow @nogc const {
-			return this.error == ErrorType.hasData;
-		}
-		
-		void opAssign(S)(auto ref S s) if(isImplicitlyConvertible!(S,T)) {
-			*(cast(T*)(this.payload.ptr)) = s;
-			this.error = ErrorType.hasData;
-		}
+	@property bool isNotNull() pure nothrow @nogc const {
+		return this.error == ErrorType.hasData;
+	}
+	
+	void opAssign(S)(auto ref S s) if(isImplicitlyConvertible!(S,T)) {
+		*(cast(T*)(this.payload.ptr)) = s;
+		this.error = ErrorType.hasData;
+	}
 
-		void set(E,Args...)(auto ref Args args) {
-			import std.conv : emplace;
-			emplace!E(this.payload[0 .. $], args);
-			mixin("this.error = ErrorType." ~ E.stringof ~ ";");
-		}
+	void set(E,Args...)(auto ref Args args) {
+		import std.conv : emplace;
+		emplace!E(this.payload[0 .. $], args);
+		mixin("this.error = ErrorType." ~ E.stringof ~ ";");
+	}
 
-		ErrorType getError() const pure @safe nothrow @nogc {
-			return this.error;
-		}
+	ErrorType getError() const pure @safe nothrow @nogc {
+		return this.error;
+	}
 
-		ref T get() @trusted {
-			if(this.error == ErrorType.hasData) {
-				return *(cast(T*)(this.payload.ptr));
-			}
-			mixin(buildThrowSwitch!(Exp)());
-			assert(false);
+	ref T get() @trusted {
+		if(this.error == ErrorType.hasData) {
+			return *(cast(T*)(this.payload.ptr));
 		}
+		mixin(buildThrowSwitch!(Exp)());
+		assert(false);
+	}
 
-		void rethrow() {
-			mixin(buildThrowSwitch!(Exp)());
-		}
+	void rethrow() {
+		mixin(buildThrowSwitch!(Exp)());
 	}
 }
 
-unittest {
+T makeNull(T,S)(auto ref S s) {
+	T ret;
+	ret = s;
+	return ret;
+}
+
+T makeNull(T,E, string file = __FILE__, size_t line = __LINE__, Args...)
+		(auto ref Args args) 
+{
+	T ret;
+	ret.set!E(args, file, line);
+	return ret;
+}
+
+pure unittest {
 	alias NullInt = Null!(int, NullPointerException, Exception);
 	NullInt ni;
 	pragma(msg, NullInt.sizeof);
@@ -185,7 +205,7 @@ unittest {
 	assert(ni.get() == 10);
 }
 
-unittest {
+pure unittest {
 	alias NullInt = Null!(int, NullPointerException, Exception);
 	NullInt ni;
 
@@ -203,4 +223,37 @@ unittest {
 	assert(npe !is null);
 	assert(npe.file == f, npe.file);
 	assert(npe.line == l);
+}
+
+pure unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	auto ni = makeNull!NullInt(10);
+	assert(ni.isNotNull);
+	assert(ni.get() == 10);
+}
+
+pure @safe unittest {
+	alias NullT = Null!(float);
+	NullT nf;
+}
+
+pure unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	auto ni = makeNull!(NullInt,NullPointerException)();
+	assert(ni.isNull);
+}
+
+pure unittest {
+	alias NullInt = Null!(int, NullPointerException, Exception);
+	string msg = "some message";
+	auto ni = makeNull!(NullInt,Exception)(msg);
+	assert(ni.isNull);
+
+	try {
+		ni.rethrow();
+	} catch(Exception e) {
+		assert(msg == e.msg);
+		return;
+	}
+	assert(false, "Wrong Exception rethrown");
 }

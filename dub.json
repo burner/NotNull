@@ -1,7 +1,7 @@
 {
 	"name": "notnull",
 	"dflags-dmd" : ["-dip1000", "-dip25"],
-	"dflags-ldc" : ["-dip1000", "-dip25"],
+	"dflags-ldc" : ["-dip25"],
 	"authors": [
 		"burner"
 	],
